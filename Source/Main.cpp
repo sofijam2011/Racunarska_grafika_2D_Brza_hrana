@@ -6,16 +6,12 @@
 #include <vector>
 #include "../Header/Util.h"
 
-// ============================================================================
-// KONSTANTE
-// ============================================================================
+// konstante
 const int TARGET_FPS = 75;
 const double FRAME_TIME = 1.0 / TARGET_FPS;
 const float MOVE_SPEED = 0.8f;
 
-// ============================================================================
-// STANJA IGRE
-// ============================================================================
+// stanja
 enum GameState {
     STATE_MENU,
     STATE_COOKING,
@@ -25,9 +21,7 @@ enum GameState {
 
 GameState currentState = STATE_MENU;
 
-// ============================================================================
-// SASTOJCI
-// ============================================================================
+// sastojci
 enum Ingredient {
     ING_DONJA_ZEMICKA,   // 0
     ING_PLJESKAVICA,     // 1
@@ -42,18 +36,16 @@ enum Ingredient {
     ING_TOTAL            // 10 (ukupan broj)
 };
 
-// ============================================================================
-// GLOBALNE PROMENLJIVE
-// ============================================================================
+// globalne promenljive
 int wWidth = 800;
 int wHeight = 600;
 
-// Mis
+// mis
 double mouseX = 0.0;
 double mouseY = 0.0;
 bool mouseClicked = false;
 
-// Tastatura - WASD + Space
+// tastatura - WASD i Space
 bool keyW = false;
 bool keyA = false;
 bool keyS = false;
@@ -61,33 +53,31 @@ bool keyD = false;
 bool keySpace = false;
 bool keySpaceJustPressed = false;
 
-// COOKING faza
+// cooking faza
 float pattyX = 0.0f;
 float pattyY = 0.3f;
 float cookProgress = 0.0f;
 
-// ASSEMBLY faza
-int currentIngredient = 0;      // Koji sastojak je aktivan
-float ingredientX = 0.0f;       // Pozicija aktivnog sastojka
+// after cooking faza
+int currentIngredient = 0;      // koji sastojak je aktivan
+float ingredientX = 0.0f;       // pozicija aktivnog sastojka
 float ingredientY = 0.5f;
-int ingredientsPlaced = 0;      // Koliko je vec postavljeno na tanjir
+int ingredientsPlaced = 0;      // koliko je vec postavljeno na tanjir
 
-// Tanjir
+// tanjir
 float plateX = -0.15f;
 float plateY = -0.65f;
 float plateW = 0.3f;
 float plateH = 0.08f;
 
-// Barice (promaseni kecap/senf)
+// barice (promaseni kecap/senf)
 struct Puddle {
     float x, y;
     bool isKetchup;  // true = crvena, false = zuta
 };
 std::vector<Puddle> puddles;
 
-// ============================================================================
-// POMOCNE FUNKCIJE
-// ============================================================================
+// pomocne funkcije
 float mouseToNDC_X() {
     return (2.0f * (float)mouseX / wWidth) - 1.0f;
 }
@@ -104,9 +94,100 @@ float lerp(float a, float b, float t) {
     return a + t * (b - a);
 }
 
-// ============================================================================
-// CALLBACK FUNKCIJE
-// ============================================================================
+// funkcija za renderovanje zemicke sa detaljima
+void drawBun(float x, float y, float w, float h, bool isTop, int uPosLoc, int uScaleLoc, int uColorLoc) {
+    // boje zemicke - razlicite nijanse da izgleda realnije
+    float bunBase = 0.85f, bunMid = 0.65f, bunDark = 0.55f;  // odnos boja
+    
+    if (isTop) {
+        // gornja zemicka - kupolast vrh (najsiri na dnu gde se lepi na burger)
+        
+        // sloj 1: donji deo - najsiri (celom sirinom)
+        glUniform2f(uPosLoc, x, y);
+        glUniform2f(uScaleLoc, w, h * 0.25f);
+        glUniform4f(uColorLoc, bunBase, bunMid, bunDark * 0.7f, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // sloj 2: srednji deo - malo uzi
+        glUniform2f(uPosLoc, x + w * 0.08f, y + h * 0.25f);
+        glUniform2f(uScaleLoc, w * 0.84f, h * 0.35f);
+        glUniform4f(uColorLoc, bunBase, bunMid, bunDark, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // sloj 3: gornji srednji - jos uzi
+        glUniform2f(uPosLoc, x + w * 0.12f, y + h * 0.6f);
+        glUniform2f(uScaleLoc, w * 0.76f, h * 0.25f);
+        glUniform4f(uColorLoc, bunBase * 0.95f, bunMid * 0.9f, bunDark * 0.8f, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // sloj 4: vrh - najuzi, najsvetliji (kora)
+        glUniform2f(uPosLoc, x + w * 0.18f, y + h * 0.85f);
+        glUniform2f(uScaleLoc, w * 0.64f, h * 0.15f);
+        glUniform4f(uColorLoc, bunBase * 0.85f, bunMid * 0.75f, bunDark * 0.6f, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // semenke na gornjoj zemickoj (rasporedjene po sredini i vrhu)
+        for (int i = 0; i < 9; i++) {
+            // semenke na srednjem delu
+            if (i < 5) {
+                float seedX = x + w * (0.2f + (i % 3) * 0.2f);
+                float seedY = y + h * (0.35f + (i / 3) * 0.2f);
+                glUniform2f(uPosLoc, seedX, seedY);
+                glUniform2f(uScaleLoc, w * 0.025f, h * 0.1f);
+                glUniform4f(uColorLoc, 0.95f, 0.92f, 0.88f, 1.0f);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            }
+            // semenke na gornjem delu
+            else {
+                float seedX = x + w * (0.25f + ((i - 5) % 2) * 0.25f);
+                float seedY = y + h * (0.65f + ((i - 5) / 2) * 0.15f);
+                glUniform2f(uPosLoc, seedX, seedY);
+                glUniform2f(uScaleLoc, w * 0.02f, h * 0.08f);
+                glUniform4f(uColorLoc, 0.92f, 0.89f, 0.85f, 1.0f);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            }
+        }
+        
+    } else {
+        // donja zemicka - obrnuta piramida (najuza na dnu, najsira na vrhu gde se slazu sastojci)
+        
+        // sloj 1: donji deo - najuzi (dno)
+        glUniform2f(uPosLoc, x + w * 0.15f, y);
+        glUniform2f(uScaleLoc, w * 0.7f, h * 0.25f);
+        glUniform4f(uColorLoc, bunBase * 0.88f, bunMid * 0.85f, bunDark * 0.75f, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // sloj 2: donji srednji - siri
+        glUniform2f(uPosLoc, x + w * 0.1f, y + h * 0.25f);
+        glUniform2f(uScaleLoc, w * 0.8f, h * 0.3f);
+        glUniform4f(uColorLoc, bunBase * 0.92f, bunMid * 0.9f, bunDark * 0.82f, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // sloj 3: gornji srednji - jos siri
+        glUniform2f(uPosLoc, x + w * 0.05f, y + h * 0.55f);
+        glUniform2f(uScaleLoc, w * 0.9f, h * 0.3f);
+        glUniform4f(uColorLoc, bunBase, bunMid, bunDark, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // sloj 4: vrh - najsiri (tamo gde se slazu sastojci) - svetlija boja jer je presek
+        glUniform2f(uPosLoc, x, y + h * 0.85f);
+        glUniform2f(uScaleLoc, w, h * 0.15f);
+        glUniform4f(uColorLoc, bunBase * 1.05f, bunMid * 1.05f, bunDark * 1.05f, 1.0f);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // tekstura sara na donjoj zemicki (tackice)
+        for (int i = 0; i < 6; i++) {
+            float dotX = x + w * (0.15f + (i % 3) * 0.25f);
+            float dotY = y + h * (0.35f + (i / 3) * 0.25f);
+            glUniform2f(uPosLoc, dotX, dotY);
+            glUniform2f(uScaleLoc, w * 0.015f, h * 0.06f);
+            glUniform4f(uColorLoc, bunBase * 0.8f, bunMid * 0.75f, bunDark * 0.65f, 1.0f);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+    }
+}
+
+// callback funkcije
 void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
     wWidth = width;
@@ -146,9 +227,6 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     }
 }
 
-// ============================================================================
-// MAIN
-// ============================================================================
 int main() {
     if (!glfwInit()) {
         std::cout << "GLFW GRESKA!" << std::endl;
@@ -159,7 +237,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    // FULLSCREEN
+    // fullscreen
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
     wWidth = mode->width;
@@ -173,7 +251,6 @@ int main() {
     }
 
     glfwMakeContextCurrent(window);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN); //dodala sam za kursor
 
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     glfwSetKeyCallback(window, keyCallback);
@@ -187,7 +264,7 @@ int main() {
 
     std::cout << "OpenGL verzija: " << glGetString(GL_VERSION) << std::endl;
 
-    // SHADER
+    // sejder
     unsigned int shader = createShader("Shaders/basic.vert", "Shaders/basic.frag");
     int uPosLoc = glGetUniformLocation(shader, "uPos");
     int uScaleLoc = glGetUniformLocation(shader, "uScale");
@@ -195,7 +272,7 @@ int main() {
     int uUseTextureLoc = glGetUniformLocation(shader, "uUseTexture");
     int uAlphaLoc = glGetUniformLocation(shader, "uAlpha");
 
-    // GEOMETRIJA
+	// geometrija za objekte
     float vertices[] = {
         0.0f, 0.0f,   0.0f, 0.0f,
         1.0f, 0.0f,   1.0f, 0.0f,
@@ -221,9 +298,8 @@ int main() {
     glEnableVertexAttribArray(1);
     glBindVertexArray(0);
 
-    // TEKSTURE
+	// teksture
     unsigned int texStudentInfo = loadImageToTexture("Textures/student_info.png");
-    unsigned int texPrijatnoInfo = loadImageToTexture("Textures/prijatno.jpg");
     if (texStudentInfo != 0) {
         glBindTexture(GL_TEXTURE_2D, texStudentInfo);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -231,30 +307,62 @@ int main() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
+        std::cout << "Student info tekstura ucitana uspesno!" << std::endl;
+    } else {
+        std::cout << "GRESKA: Student info tekstura nije ucitana!" << std::endl;
     }
 
-    if (texPrijatnoInfo != 0) {
-        glBindTexture(GL_TEXTURE_2D, texPrijatnoInfo);
+    unsigned int texPrijatno = loadImageToTexture("Textures/prijatno.png");
+    if (texPrijatno != 0) {
+        glBindTexture(GL_TEXTURE_2D, texPrijatno);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
+        std::cout << "Prijatno tekstura ucitana uspesno!" << std::endl;
+    } else {
+        std::cout << "Greska: Prijatno tekstura nije ucitana!" << std::endl;
     }
 
-    // POSTAVKE
+    unsigned int texKetchup = loadImageToTexture("Textures/kecap.png");
+    if (texKetchup != 0) {
+        glBindTexture(GL_TEXTURE_2D, texKetchup);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        std::cout << "Ketchup tekstura ucitana uspesno!" << std::endl;
+    } else {
+        std::cout << "Greska: Kecap tekstura nije ucitana!" << std::endl;
+    }
+
+    unsigned int texMustard = loadImageToTexture("Textures/senf.png");
+    if (texMustard != 0) {
+        glBindTexture(GL_TEXTURE_2D, texMustard);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        std::cout << "Mustard tekstura ucitana uspesno!" << std::endl;
+    } else {
+        std::cout << "Greska: Senf tekstura nije ucitana!" << std::endl;
+    }
+
+    // postavke
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Dugme
+	// dugme u meniju
     float btnX = -0.3f, btnY = -0.1f, btnW = 0.6f, btnH = 0.2f;
 
-    std::cout << "MENU: Klikni na dugme za pocetak!" << std::endl;
+    std::cout << "Menu: Klikni na dugme za pocetak!" << std::endl;
 
-    // TIMING
+    // timing
     auto lastTime = std::chrono::high_resolution_clock::now();
 
-    // GLAVNA PETLJA
     while (!glfwWindowShouldClose(window)) {
         auto currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> deltaTime = currentTime - lastTime;
@@ -263,15 +371,13 @@ int main() {
 
         glfwPollEvents();
 
-        // ====================================================================
-        // UPDATE
-        // ====================================================================
+        // update
         if (currentState == STATE_MENU) {
             if (mouseClicked) {
                 float mx = mouseToNDC_X();
                 float my = mouseToNDC_Y();
                 if (pointInRect(mx, my, btnX, btnY, btnW, btnH)) {
-                    std::cout << "Prelazim u COOKING!" << std::endl;
+                    std::cout << "Prelazim u cooking fazu!" << std::endl;
                     currentState = STATE_COOKING;
                     pattyX = -0.1f;
                     pattyY = 0.3f;
@@ -281,28 +387,28 @@ int main() {
             }
         }
         else if (currentState == STATE_COOKING) {
-            // Pomeranje pljeskavice - WASD
+            // pomeranje pljeskavice - WASD
             if (keyW) pattyY += MOVE_SPEED * (float)dt;
             if (keyS) pattyY -= MOVE_SPEED * (float)dt;
             if (keyA) pattyX -= MOVE_SPEED * (float)dt;
             if (keyD) pattyX += MOVE_SPEED * (float)dt;
 
-            // Pozicija i dimenzije ringle
+            // pozicija i dimenzije ringle
             float ringlaX = -0.25f;
             float ringlaY = -0.72f;
             float ringlaW = 0.5f;
             float ringlaH = 0.08f;
 
-            // Dimenzije pljeskavice
+            // dimenzije pljeskavice
             float pattyW = 0.2f;
             float pattyH = 0.1f;
 
-            // Granice kretanja
+            // granice kretanja
             if (pattyX < -0.85f) pattyX = -0.85f;
             if (pattyX > 0.65f) pattyX = 0.65f;
             if (pattyY > 0.75f) pattyY = 0.75f;
 
-            // Donja granica - zavisi da li je iznad ringle ili ne
+            // donja granica - zavisi da li je iznad ringle ili ne
             float ringlaTop = ringlaY + ringlaH;
             bool iznadRingle = (pattyX + pattyW > ringlaX) && (pattyX < ringlaX + ringlaW);
 
@@ -312,15 +418,15 @@ int main() {
                 if (pattyY < -0.6f) pattyY = -0.6f;
             }
 
-            // Da li pljeskavica dodiruje ringlu?
+            // da li pljeskavica dodiruje ringlu?
             bool touchingStove = iznadRingle && (pattyY <= ringlaTop + 0.01f);
 
-            // Ako dodiruje, peci
+            // ako dodiruje, peci
             if (touchingStove && cookProgress < 1.0f) {
                 cookProgress += 0.12f * (float)dt;
                 if (cookProgress >= 1.0f) {
                     cookProgress = 1.0f;
-                    std::cout << "Pljeskavica ispečena! Prelazim u ASSEMBLY..." << std::endl;
+                    std::cout << "Pljeskavica ispecena! Prelazim u ASSEMBLY..." << std::endl;
                     currentState = STATE_ASSEMBLY;
                     currentIngredient = ING_DONJA_ZEMICKA;
                     ingredientX = 0.0f;
@@ -330,37 +436,53 @@ int main() {
             }
         }
         else if (currentState == STATE_ASSEMBLY) {
-            // Pomeranje sastojka - WASD
+            // pomeranje sastojka - WASD
             if (keyW) ingredientY += MOVE_SPEED * (float)dt;
             if (keyS) ingredientY -= MOVE_SPEED * (float)dt;
             if (keyA) ingredientX -= MOVE_SPEED * (float)dt;
             if (keyD) ingredientX += MOVE_SPEED * (float)dt;
 
-            // Granice kretanja
+            // granice kretanja
             if (ingredientX < -0.9f) ingredientX = -0.9f;
             if (ingredientX > 0.7f) ingredientX = 0.7f;
             if (ingredientY > 0.8f) ingredientY = 0.8f;
 
-            // Dimenzije sastojka (varira, ali za proveru koristimo prosek)
+            // dimenzije sastojka 
             float ingW = 0.2f;
             float ingH = 0.06f;
 
-            // Vrh tanjira + visina vec postavljenih sastojaka
-            float stackTop = plateY + plateH + (ingredientsPlaced * 0.045f);
+            // vrh tanjira + visina vec postavljenih sastojaka 
+            float stackTop = plateY + plateH;
+            for (int i = 0; i < ingredientsPlaced; i++) {
+                float sh = 0.04f;
+                switch (i) {
+                    case ING_DONJA_ZEMICKA: sh = 0.05f; break;
+                    case ING_PLJESKAVICA:   sh = 0.04f; break;
+                    case ING_KECAP:         sh = 0.015f; break;
+                    case ING_SENF:          sh = 0.015f; break;
+                    case ING_KRASTAVCICI:   sh = 0.03f; break;
+                    case ING_LUK:           sh = 0.03f; break;
+                    case ING_SALATA:        sh = 0.035f; break;
+                    case ING_SIR:           sh = 0.025f; break;
+                    case ING_PARADAJZ:      sh = 0.03f; break;
+                    case ING_GORNJA_ZEMICKA: sh = 0.06f; break;
+                }
+                stackTop += sh;
+            }
 
-            // Da li je sastojak iznad tanjira?
+            // da li je sastojak iznad tanjira?
             bool iznadTanjira = (ingredientX + ingW > plateX) && (ingredientX < plateX + plateW);
 
-            // Donja granica
+            // donja granica
             if (iznadTanjira) {
                 if (ingredientY < stackTop) ingredientY = stackTop;
             } else {
                 if (ingredientY < -0.5f) ingredientY = -0.5f;
             }
 
-            // Za kecap i senf - pritisak Space
+            // za kecap i senf - pritisak Space
             if (currentIngredient == ING_KECAP || currentIngredient == ING_SENF) {
-                // Sirina flasice za proveru
+                // sirina flasice za proveru
                 float flasicaW = 0.06f;
                 bool flasicaIznadTanjira = (ingredientX + flasicaW > plateX) && (ingredientX < plateX + plateW);
 
@@ -368,7 +490,7 @@ int main() {
                     keySpaceJustPressed = false;
 
                     if (flasicaIznadTanjira) {
-                        // Uspesno - flasica je horizontalno iznad tanjira
+                        // uspesno - flasica je horizontalno iznad tanjira
                         std::cout << "Dodato: " << (currentIngredient == ING_KECAP ? "Kecap" : "Senf") << std::endl;
                         ingredientsPlaced++;
                         currentIngredient++;
@@ -376,7 +498,7 @@ int main() {
                         ingredientY = 0.5f;
                     }
                     else {
-                        // Promaseno - flasica NIJE iznad tanjira, barica na stolu
+                        // promaseno - flasica nije iznad tanjira, barica na stolu
                         Puddle p;
                         p.x = ingredientX;
                         p.y = -0.72f;
@@ -386,7 +508,7 @@ int main() {
                     }
                 }
             }
-            // Ostali sastojci - stavljanje na tanjir
+            // ostali sastojci - stavljanje na tanjir
             else {
                 bool dodirujeTanjir = iznadTanjira && (ingredientY <= stackTop + 0.01f);
 
@@ -397,7 +519,7 @@ int main() {
                     ingredientX = 0.0f;
                     ingredientY = 0.5f;
 
-                    // Da li je poslednji sastojak (gornja zemicka)?
+                    // da li je poslednji sastojak (gornja zemicka)?
                     if (currentIngredient >= ING_TOTAL) {
                         std::cout << "GOTOVO! Prijatno!" << std::endl;
                         currentState = STATE_FINISHED;
@@ -405,23 +527,20 @@ int main() {
                 }
             }
 
-            // Reset space flag
             keySpaceJustPressed = false;
         }
         // STATE_FINISHED - ceka ESC
 
-        // ====================================================================
-        // RENDEROVANJE
-        // ====================================================================
+        // renderovanje
         glUseProgram(shader);
         glBindVertexArray(VAO);
 
-        // --- STATE_MENU ---
+        // STATE_MENU 
         if (currentState == STATE_MENU) {
             glClearColor(0.4f, 0.2f, 0.15f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            // Okvir dugmeta
+            // okvir dugmeta
             glUniform2f(uPosLoc, btnX - 0.01f, btnY - 0.01f);
             glUniform2f(uScaleLoc, btnW + 0.02f, btnH + 0.02f);
             glUniform4f(uColorLoc, 0.3f, 0.1f, 0.05f, 1.0f);
@@ -429,25 +548,25 @@ int main() {
             glUniform1f(uAlphaLoc, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // Dugme
+            // dugme
             glUniform2f(uPosLoc, btnX, btnY);
             glUniform2f(uScaleLoc, btnW, btnH);
             glUniform4f(uColorLoc, 0.8f, 0.2f, 0.1f, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // Tekst simulacija
+            // tekst simulacija
             glUniform2f(uPosLoc, btnX + 0.1f, btnY + 0.08f);
             glUniform2f(uScaleLoc, btnW - 0.2f, 0.04f);
             glUniform4f(uColorLoc, 1.0f, 0.9f, 0.8f, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
 
-        // --- STATE_COOKING ---
+        // STATE_COOKING 
         else if (currentState == STATE_COOKING) {
             glClearColor(0.4f, 0.45f, 0.5f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            // SPORET
+            // sporet
             glUniform2f(uPosLoc, -0.6f, -1.0f);
             glUniform2f(uScaleLoc, 1.2f, 0.35f);
             glUniform4f(uColorLoc, 0.15f, 0.15f, 0.15f, 1.0f);
@@ -455,26 +574,26 @@ int main() {
             glUniform1f(uAlphaLoc, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // RINGLA
+            // ringla
             glUniform2f(uPosLoc, -0.25f, -0.72f);
             glUniform2f(uScaleLoc, 0.5f, 0.08f);
             glUniform4f(uColorLoc, 0.9f, 0.3f, 0.1f, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // LOADING BAR - pozadina
+            // loading bar - pozadina
             float barX = -0.4f, barY = 0.85f, barW = 0.8f, barH = 0.07f;
             glUniform2f(uPosLoc, barX, barY);
             glUniform2f(uScaleLoc, barW, barH);
             glUniform4f(uColorLoc, 0.3f, 0.3f, 0.3f, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // LOADING BAR - progress
+            // loading bar - progress
             glUniform2f(uPosLoc, barX, barY);
             glUniform2f(uScaleLoc, barW * cookProgress, barH);
             glUniform4f(uColorLoc, 0.2f, 0.85f, 0.2f, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // PLJESKAVICA
+            // pljeska
             float rawR = 0.85f, rawG = 0.5f, rawB = 0.5f;
             float cookedR = 0.4f, cookedG = 0.22f, cookedB = 0.12f;
             float pR = lerp(rawR, cookedR, cookProgress);
@@ -487,13 +606,13 @@ int main() {
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
 
-        // --- STATE_ASSEMBLY ---
+        // STATE_ASSEMBLY 
         else if (currentState == STATE_ASSEMBLY) {
-            // Pozadina - restoran
+            // pozadina 
             glClearColor(0.5f, 0.45f, 0.4f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            // STO - braon pravougaonik na dnu
+            // sto 
             glUniform2f(uPosLoc, -1.0f, -1.0f);
             glUniform2f(uScaleLoc, 2.0f, 0.35f);
             glUniform4f(uColorLoc, 0.45f, 0.3f, 0.15f, 1.0f);
@@ -501,13 +620,13 @@ int main() {
             glUniform1f(uAlphaLoc, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // TANJIR - svetlo sivi/beli
+            // tanjir 
             glUniform2f(uPosLoc, plateX, plateY);
             glUniform2f(uScaleLoc, plateW, plateH);
             glUniform4f(uColorLoc, 0.9f, 0.9f, 0.85f, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // BARICE na stolu (promaseni kecap/senf)
+            // barice na stolu (promaseni kecap/senf)
             for (const Puddle& p : puddles) {
                 glUniform2f(uPosLoc, p.x, p.y);
                 glUniform2f(uScaleLoc, 0.08f, 0.025f);
@@ -519,71 +638,133 @@ int main() {
                 glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             }
 
-            // VEC POSTAVLJENI SASTOJCI na tanjiru
+            // vec postavljeni sastojci na tanjiru
             float stackY = plateY + plateH;
             for (int i = 0; i < ingredientsPlaced; i++) {
-                int ingType = i;  // Redosled = tip sastojka
+                int ingType = i;  // redosled = tip sastojka
                 float sx = plateX + 0.02f;
                 float sw = plateW - 0.04f;
                 float sh = 0.04f;
 
-                // Boja za svaki sastojak
+                // boja za svaki sastojak
                 float r, g, b;
                 switch (ingType) {
-                    case ING_DONJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; break;
-                    case ING_PLJESKAVICA:   r = 0.4f; g = 0.22f; b = 0.12f; break;
-                    case ING_KECAP:         r = 0.8f; g = 0.1f; b = 0.1f; sh = 0.02f; break;
-                    case ING_SENF:          r = 0.9f; g = 0.8f; b = 0.1f; sh = 0.02f; break;
-                    case ING_KRASTAVCICI:   r = 0.5f; g = 0.7f; b = 0.3f; break;
-                    case ING_LUK:           r = 0.95f; g = 0.9f; b = 0.95f; break;
-                    case ING_SALATA:        r = 0.3f; g = 0.8f; b = 0.3f; break;
-                    case ING_SIR:           r = 1.0f; g = 0.85f; b = 0.2f; break;
-                    case ING_PARADAJZ:      r = 0.9f; g = 0.2f; b = 0.15f; break;
+                    case ING_DONJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; sh = 0.05f; break;
+                    case ING_PLJESKAVICA:   r = 0.4f; g = 0.22f; b = 0.12f; sh = 0.04f; break;
+                    case ING_KECAP:         r = 0.8f; g = 0.1f; b = 0.1f; sh = 0.015f; break;  //
+                    case ING_SENF:          r = 0.9f; g = 0.8f; b = 0.1f; sh = 0.015f; break;  // 
+                    case ING_KRASTAVCICI:   r = 0.5f; g = 0.7f; b = 0.3f; sh = 0.03f; break;
+                    case ING_LUK:           r = 0.95f; g = 0.9f; b = 0.95f; sh = 0.03f; break;
+                    case ING_SALATA:        r = 0.3f; g = 0.8f; b = 0.3f; sh = 0.035f; break;
+                    case ING_SIR:           r = 1.0f; g = 0.75f; b = 0.15f; sh = 0.025f; break; // 
+                    case ING_PARADAJZ:      r = 0.95f; g = 0.3f; b = 0.2f; sh = 0.03f; break;  //
                     case ING_GORNJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; sh = 0.06f; break;
                     default: r = 0.5f; g = 0.5f; b = 0.5f; break;
                 }
 
-                glUniform2f(uPosLoc, sx, stackY);
-                glUniform2f(uScaleLoc, sw, sh);
-                glUniform4f(uColorLoc, r, g, b, 1.0f);
-                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                // za isecene krastavcice
+                if (ingType == ING_KRASTAVCICI) {
+                    // 5 manjih komada sa razmakom
+                    int numPieces = 5;
+                    float pieceWidth = (sw / numPieces) * 0.8f;  // 0.8 za razmak
+                    float spacing = sw / numPieces;
+                    
+                    for (int p = 0; p < numPieces; p++) {
+                        float pieceX = sx + (p * spacing) + (spacing - pieceWidth) / 2.0f;
+                        glUniform2f(uPosLoc, pieceX, stackY);
+                        glUniform2f(uScaleLoc, pieceWidth, sh);
+                        glUniform4f(uColorLoc, r, g, b, 1.0f);
+                        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                    }
+                } else if (ingType == ING_DONJA_ZEMICKA) {
+                    drawBun(sx, stackY, sw, sh, false, uPosLoc, uScaleLoc, uColorLoc);
+                } else if (ingType == ING_GORNJA_ZEMICKA) {
+                    drawBun(sx, stackY, sw, sh, true, uPosLoc, uScaleLoc, uColorLoc);
+                } else {
+                    glUniform2f(uPosLoc, sx, stackY);
+                    glUniform2f(uScaleLoc, sw, sh);
+                    glUniform4f(uColorLoc, r, g, b, 1.0f);
+                    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                }
 
-                stackY += 0.045f;
+                stackY += sh;  // dodajem stvarnu visinu sastojka
             }
 
-            // AKTIVNI SASTOJAK koji se pomera
+            // aktivni sastojak koji se pomera
             if (currentIngredient < ING_TOTAL) {
                 float r, g, b;
-                float iw = 0.18f, ih = 0.05f;
+                float iw = plateW - 0.04f;  
+                float ih = 0.05f;
 
                 switch (currentIngredient) {
                     case ING_DONJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; break;
                     case ING_PLJESKAVICA:   r = 0.4f; g = 0.22f; b = 0.12f; break;
-                    case ING_KECAP:         r = 0.8f; g = 0.1f; b = 0.1f; iw = 0.06f; ih = 0.15f; break;
-                    case ING_SENF:          r = 0.9f; g = 0.8f; b = 0.1f; iw = 0.06f; ih = 0.15f; break;
+                    case ING_KECAP:         r = 0.8f; g = 0.1f; b = 0.1f; iw = 0.06f; ih = 0.15f; break;  // 
+                    case ING_SENF:          r = 0.9f; g = 0.8f; b = 0.1f; iw = 0.06f; ih = 0.15f; break;  //
                     case ING_KRASTAVCICI:   r = 0.5f; g = 0.7f; b = 0.3f; break;
                     case ING_LUK:           r = 0.95f; g = 0.9f; b = 0.95f; break;
                     case ING_SALATA:        r = 0.3f; g = 0.8f; b = 0.3f; break;
-                    case ING_SIR:           r = 1.0f; g = 0.85f; b = 0.2f; break;
-                    case ING_PARADAJZ:      r = 0.9f; g = 0.2f; b = 0.15f; break;
+                    case ING_SIR:           r = 1.0f; g = 0.75f; b = 0.15f; break;  // 
+                    case ING_PARADAJZ:      r = 0.95f; g = 0.3f; b = 0.2f; break;   //
                     case ING_GORNJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; ih = 0.07f; break;
                     default: r = 0.5f; g = 0.5f; b = 0.5f; break;
                 }
 
-                glUniform2f(uPosLoc, ingredientX, ingredientY);
-                glUniform2f(uScaleLoc, iw, ih);
-                glUniform4f(uColorLoc, r, g, b, 1.0f);
-                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                // za kecap i senf - flašice sa teksturama
+                if (currentIngredient == ING_KECAP || currentIngredient == ING_SENF) {
+                    glUniform2f(uPosLoc, ingredientX, ingredientY);
+                    glUniform2f(uScaleLoc, iw, ih);
+                    glUniform1i(uUseTextureLoc, true);
+                    glUniform1f(uAlphaLoc, 1.0f);
+                    glActiveTexture(GL_TEXTURE0);
+                    
+                    if (currentIngredient == ING_KECAP && texKetchup != 0) {
+                        glBindTexture(GL_TEXTURE_2D, texKetchup);
+                    } else if (currentIngredient == ING_SENF && texMustard != 0) {
+                        glBindTexture(GL_TEXTURE_2D, texMustard);
+                    } else {
+                        // fallback - ako tekstura nije ucitana, koristi boju
+                        glUniform1i(uUseTextureLoc, false);
+                        glUniform4f(uColorLoc, r, g, b, 1.0f);
+                    }
+                    
+                    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                    glUniform1i(uUseTextureLoc, false);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                }
+                // krastavcici da budu kao delovi
+                else if (currentIngredient == ING_KRASTAVCICI) {
+                    int numPieces = 5;
+                    float pieceWidth = (iw / numPieces) * 0.8f;
+                    float spacing = iw / numPieces;
+                    
+                    for (int p = 0; p < numPieces; p++) {
+                        float pieceX = ingredientX + (p * spacing) + (spacing - pieceWidth) / 2.0f;
+                        glUniform2f(uPosLoc, pieceX, ingredientY);
+                        glUniform2f(uScaleLoc, pieceWidth, ih);
+                        glUniform4f(uColorLoc, r, g, b, 1.0f);
+                        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                    }
+                } else if (currentIngredient == ING_DONJA_ZEMICKA) {
+                    drawBun(ingredientX, ingredientY, iw, ih, false, uPosLoc, uScaleLoc, uColorLoc);
+                } else if (currentIngredient == ING_GORNJA_ZEMICKA) {
+                    drawBun(ingredientX, ingredientY, iw, ih, true, uPosLoc, uScaleLoc, uColorLoc);
+                } else {
+                    glUniform2f(uPosLoc, ingredientX, ingredientY);
+                    glUniform2f(uScaleLoc, iw, ih);
+                    glUniform4f(uColorLoc, r, g, b, 1.0f);
+                    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                }
             }
         }
 
-        // --- STATE_FINISHED ---
+        // STATE_FINISHED 
         else if (currentState == STATE_FINISHED) {
-            // Pozadina
+            // pozadina
             glClearColor(0.5f, 0.45f, 0.4f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            // STO
+            // sto
             glUniform2f(uPosLoc, -1.0f, -1.0f);
             glUniform2f(uScaleLoc, 2.0f, 0.35f);
             glUniform4f(uColorLoc, 0.45f, 0.3f, 0.15f, 1.0f);
@@ -591,68 +772,123 @@ int main() {
             glUniform1f(uAlphaLoc, 1.0f);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // TANJIR
+            for (const Puddle& p : puddles) {
+                glUniform2f(uPosLoc, p.x, p.y);
+                glUniform2f(uScaleLoc, 0.08f, 0.025f);
+                if (p.isKetchup) {
+                    glUniform4f(uColorLoc, 0.8f, 0.1f, 0.1f, 0.9f);
+                } else {
+                    glUniform4f(uColorLoc, 0.9f, 0.8f, 0.1f, 0.9f);
+                }
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            }
+
+            // tanjir
             glUniform2f(uPosLoc, plateX, plateY);
             glUniform2f(uScaleLoc, plateW, plateH);
             glUniform4f(uColorLoc, 0.9f, 0.9f, 0.85f, 1.0f);
+            glUniform1i(uUseTextureLoc, false);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-            // GOTOV BURGER - pojednostavljeno
+            // gotov hamburger 
             float stackY = plateY + plateH;
             for (int i = 0; i < ING_TOTAL; i++) {
                 float r, g, b;
                 float sh = 0.04f;
                 switch (i) {
-                    case ING_DONJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; break;
-                    case ING_PLJESKAVICA:   r = 0.4f; g = 0.22f; b = 0.12f; break;
-                    case ING_KECAP:         r = 0.8f; g = 0.1f; b = 0.1f; sh = 0.02f; break;
-                    case ING_SENF:          r = 0.9f; g = 0.8f; b = 0.1f; sh = 0.02f; break;
-                    case ING_KRASTAVCICI:   r = 0.5f; g = 0.7f; b = 0.3f; break;
-                    case ING_LUK:           r = 0.95f; g = 0.9f; b = 0.95f; break;
-                    case ING_SALATA:        r = 0.3f; g = 0.8f; b = 0.3f; break;
-                    case ING_SIR:           r = 1.0f; g = 0.85f; b = 0.2f; break;
-                    case ING_PARADAJZ:      r = 0.9f; g = 0.2f; b = 0.15f; break;
+                    case ING_DONJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; sh = 0.05f; break;
+                    case ING_PLJESKAVICA:   r = 0.4f; g = 0.22f; b = 0.12f; sh = 0.04f; break;
+                    case ING_KECAP:         r = 0.8f; g = 0.1f; b = 0.1f; sh = 0.015f; break;  //  
+                    case ING_SENF:          r = 0.9f; g = 0.8f; b = 0.1f; sh = 0.015f; break;  // 
+                    case ING_KRASTAVCICI:   r = 0.5f; g = 0.7f; b = 0.3f; sh = 0.03f; break;
+                    case ING_LUK:           r = 0.95f; g = 0.9f; b = 0.95f; sh = 0.03f; break;
+                    case ING_SALATA:        r = 0.3f; g = 0.8f; b = 0.3f; sh = 0.035f; break;
+                    case ING_SIR:           r = 1.0f; g = 0.75f; b = 0.15f; sh = 0.025f; break; // 
+                    case ING_PARADAJZ:      r = 0.95f; g = 0.3f; b = 0.2f; sh = 0.03f; break;  //
                     case ING_GORNJA_ZEMICKA: r = 0.9f; g = 0.7f; b = 0.4f; sh = 0.06f; break;
                     default: r = 0.5f; g = 0.5f; b = 0.5f; break;
                 }
-                glUniform2f(uPosLoc, plateX + 0.02f, stackY);
-                glUniform2f(uScaleLoc, plateW - 0.04f, sh);
-                glUniform4f(uColorLoc, r, g, b, 1.0f);
-                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-                stackY += 0.045f;
+                
+                // krastavcici da ostanu kao delovi i na kraju
+                if (i == ING_KRASTAVCICI) {
+                    int numPieces = 5;
+                    float sw = plateW - 0.04f;
+                    float pieceWidth = (sw / numPieces) * 0.8f;
+                    float spacing = sw / numPieces;
+                    
+                    glUniform1i(uUseTextureLoc, false);
+                    for (int p = 0; p < numPieces; p++) {
+                        float pieceX = (plateX + 0.02f) + (p * spacing) + (spacing - pieceWidth) / 2.0f;
+                        glUniform2f(uPosLoc, pieceX, stackY);
+                        glUniform2f(uScaleLoc, pieceWidth, sh);
+                        glUniform4f(uColorLoc, r, g, b, 1.0f);
+                        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                    }
+                } else if (i == ING_DONJA_ZEMICKA) {
+                    glUniform1i(uUseTextureLoc, false);
+                    drawBun(plateX + 0.02f, stackY, plateW - 0.04f, sh, false, uPosLoc, uScaleLoc, uColorLoc);
+                } else if (i == ING_GORNJA_ZEMICKA) {
+                    glUniform1i(uUseTextureLoc, false);
+                    drawBun(plateX + 0.02f, stackY, plateW - 0.04f, sh, true, uPosLoc, uScaleLoc, uColorLoc);
+                } else {
+                    glUniform1i(uUseTextureLoc, false);
+                    glUniform2f(uPosLoc, plateX + 0.02f, stackY);
+                    glUniform2f(uScaleLoc, plateW - 0.04f, sh);
+                    glUniform4f(uColorLoc, r, g, b, 1.0f);
+                    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                }
+                
+                stackY += sh;  // dodajem stvarnu visinu sastojka
             }
 
-            // PRIJATNO! - zeleni banner
-            glUniform2f(uPosLoc, -0.35f, 0.3f);
-            glUniform2f(uScaleLoc, 0.7f, 0.15f);
-            glUniform4f(uColorLoc, 0.2f, 0.7f, 0.3f, 0.95f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            // prijatno!
+            if (texPrijatno != 0) {
+                // dimenzije teksture u pikselima
+                float imgW = 800.0f;   // sirina slike
+                float imgH = 200.0f;   // visina slike
 
-            // Beli tekst simulacija
-            glUniform2f(uPosLoc, -0.25f, 0.35f);
-            glUniform2f(uScaleLoc, 0.5f, 0.05f);
-            glUniform4f(uColorLoc, 1.0f, 1.0f, 1.0f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                float desiredWidthNDC = 0.8f; 
+
+                float scaleX = desiredWidthNDC;
+                float scaleY = desiredWidthNDC * (imgH / imgW) * ((float)wWidth / (float)wHeight);
+
+                // centriranje slike
+                float posX = -scaleX / 2.0f;
+                float posY = 0.3f;  // iznad burgera
+
+                glUniform2f(uPosLoc, posX, posY);
+                glUniform2f(uScaleLoc, scaleX, scaleY);
+                glUniform1i(uUseTextureLoc, true);
+                glUniform1f(uAlphaLoc, 1.0f);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, texPrijatno);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                
+                glUniform1i(uUseTextureLoc, false);
+                glBindTexture(GL_TEXTURE_2D, 0);
+            } else {
+				// ako tekstura nije ucitana, prikazi fallback
+                std::cout << "Prikazujem fallback za PRIJATNO!" << std::endl;
+                
+            }
         }
 
-        // STUDENTSKI PODACI - uvek vidljivo
+        // studentski podaci - uvek vidljivo
         if (texStudentInfo != 0) {
-            // 1) dimenzije teksture u pixelima (ubaci prave vrednosti koje ima tvoj PNG)
-            float imgW = 600.0f;   // <-- stavi prave vrednosti (width)
-            float imgH = 300.0f;   // <-- stavi prave vrednosti (height)
+            // dimenzije teksture u pikselima
+            float imgW = 600.0f;  
+            float imgH = 300.0f;   
 
-            // 2) koliko prostora u NDC (x) želiš da zauzme kartica (npr 0.48)
-            //    ovo je širina u NDC (NDC: -1..1)
-            float desiredWidthNDC = 0.48f;
+            // koliko prostora zelim da zauzme kartica
+            float desiredWidthNDC = 0.48f; //od -1 do 1
 
-            // 3) računamo visinu u NDC tako da se očuva aspekt slike na ekranu
-            //    formula izvedena iz mapiranja NDC -> pixeli:
-            //    (scaleX / scaleY) * (screenWidth / screenHeight) = imgW / imgH
+            // racunam visinu u NDC tako da se ocuva aspekt slike na ekranu
+            // formula izvedena iz mapiranja NDC -> pixeli:
+            // (scaleX / scaleY) * (screenWidth / screenHeight) = imgW / imgH
             float scaleX = desiredWidthNDC;
             float scaleY = desiredWidthNDC * (imgH / imgW) * ((float)wWidth / (float)wHeight);
 
-            // 4) pozicija: bottom-left anchor se koristi (jer su ti vertexi 0..1)
-            //    da bi karticu smestila u donji desni ugao izračunamo x tako da desna ivica bude malo
+            // da bih karticu smestila u donji desni ugao izracunam x tako da desna ivica bude malo
             //    udaljena od ruba (-1..1), tj. pos.x + scaleX = 1 - marginNDC
             float marginNDC_x = 0.02f; // udaljenost od desnog ruba (u NDC)
             float marginNDC_y = 0.02f; // udaljenost od donjeg ruba (u NDC)
@@ -660,7 +896,7 @@ int main() {
             float posX = 1.0f - scaleX - marginNDC_x;   // bottom-left x tako da desna ivica bude margin od ruba
             float posY = -1.0f + marginNDC_y;           // bottom-left y blizu dna
 
-            // 5) set uniforms i crtanje
+            // set uniforms i crtanje
             glUniform2f(uPosLoc, posX, posY);
             glUniform2f(uScaleLoc, scaleX, scaleY);
             glUniform1i(uUseTextureLoc, true);
@@ -673,100 +909,19 @@ int main() {
         glBindVertexArray(0);
         glUseProgram(0);
 
-        // Na kraju render dela, pre glfwSwapBuffers(window);
 
-// PRILAGOĐENI KURSOR - dijagonalna spatula
-        {
-            float cursorX = mouseToNDC_X();
-            float cursorY = mouseToNDC_Y();
-
-            glUseProgram(shader);
-            glBindVertexArray(VAO);
-            glUniform1i(uUseTextureLoc, false);
-            glUniform1f(uAlphaLoc, 1.0f);
-
-            // === METALNI DEO - gornji levi ugao (širi kvadrat) ===
-            // Senca
-            glUniform2f(uPosLoc, cursorX - 0.05f, cursorY - 0.005f);
-            glUniform2f(uScaleLoc, 0.07f, 0.05f);
-            glUniform4f(uColorLoc, 0.3f, 0.3f, 0.35f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Glavni metalni deo
-            glUniform2f(uPosLoc, cursorX - 0.048f, cursorY - 0.003f);
-            glUniform2f(uScaleLoc, 0.07f, 0.05f);
-            glUniform4f(uColorLoc, 0.78f, 0.78f, 0.82f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Sjaj
-            glUniform2f(uPosLoc, cursorX - 0.04f, cursorY + 0.005f);
-            glUniform2f(uScaleLoc, 0.04f, 0.03f);
-            glUniform4f(uColorLoc, 0.95f, 0.95f, 0.98f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // === DIJAGONALNI SEGMENTI - pravimo vizuelnu dijagonalu ===
-            // Segment 1 (prelaz metal->drška)
-            glUniform2f(uPosLoc, cursorX + 0.015f, cursorY - 0.04f);
-            glUniform2f(uScaleLoc, 0.025f, 0.03f);
-            glUniform4f(uColorLoc, 0.5f, 0.32f, 0.22f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Segment 2
-            glUniform2f(uPosLoc, cursorX + 0.03f, cursorY - 0.065f);
-            glUniform2f(uScaleLoc, 0.025f, 0.03f);
-            glUniform4f(uColorLoc, 0.45f, 0.28f, 0.18f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Segment 3
-            glUniform2f(uPosLoc, cursorX + 0.045f, cursorY - 0.09f);
-            glUniform2f(uScaleLoc, 0.025f, 0.03f);
-            glUniform4f(uColorLoc, 0.45f, 0.28f, 0.18f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Segment 4 (glavni deo drške)
-            glUniform2f(uPosLoc, cursorX + 0.06f, cursorY - 0.115f);
-            glUniform2f(uScaleLoc, 0.025f, 0.04f);
-            glUniform4f(uColorLoc, 0.45f, 0.28f, 0.18f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Segment 5 (nastavak)
-            glUniform2f(uPosLoc, cursorX + 0.075f, cursorY - 0.15f);
-            glUniform2f(uScaleLoc, 0.025f, 0.04f);
-            glUniform4f(uColorLoc, 0.45f, 0.28f, 0.18f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Završetak drške (okruglo)
-            glUniform2f(uPosLoc, cursorX + 0.085f, cursorY - 0.185f);
-            glUniform2f(uScaleLoc, 0.03f, 0.025f);
-            glUniform4f(uColorLoc, 0.35f, 0.22f, 0.14f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Svetli highlighter na drški (dijagonalna linija)
-            glUniform2f(uPosLoc, cursorX + 0.018f, cursorY - 0.042f);
-            glUniform2f(uScaleLoc, 0.01f, 0.02f);
-            glUniform4f(uColorLoc, 0.6f, 0.42f, 0.32f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            glUniform2f(uPosLoc, cursorX + 0.035f, cursorY - 0.07f);
-            glUniform2f(uScaleLoc, 0.01f, 0.025f);
-            glUniform4f(uColorLoc, 0.6f, 0.42f, 0.32f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            glUniform2f(uPosLoc, cursorX + 0.062f, cursorY - 0.12f);
-            glUniform2f(uScaleLoc, 0.01f, 0.035f);
-            glUniform4f(uColorLoc, 0.6f, 0.42f, 0.32f, 1.0f);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            glBindVertexArray(0);
-            glUseProgram(0);
+        // spatula kursor
+        GLFWcursor* compassCursor = loadImageToCursor("./Resources/cursor.png");
+        if (compassCursor != nullptr) {
+            glfwSetCursor(window, compassCursor);
+        }
+        else {
+            std::cout << "Upozorenje: Kursor spatule nije ucitan. Koristi se default kursor." << std::endl;
         }
 
-        //glBindVertexArray(0);
-        //glUseProgram(0);
-
         glfwSwapBuffers(window);
-
-        // FRAME LIMITER
+        
+        // frame limiter
         auto frameEnd = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = frameEnd - currentTime;
         if (elapsed.count() < FRAME_TIME) {
@@ -774,12 +929,15 @@ int main() {
         }
     }
 
-    // CLEANUP
+    // cleanup
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteVertexArrays(1, &VAO);
     glDeleteProgram(shader);
     if (texStudentInfo != 0) glDeleteTextures(1, &texStudentInfo);
+    if (texPrijatno != 0) glDeleteTextures(1, &texPrijatno);
+    if (texKetchup != 0) glDeleteTextures(1, &texKetchup);
+    if (texMustard != 0) glDeleteTextures(1, &texMustard);
 
     glfwDestroyWindow(window);
     glfwTerminate();

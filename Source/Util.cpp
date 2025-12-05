@@ -139,7 +139,8 @@ GLFWcursor* loadImageToCursor(const char* filePath) {
     int TextureHeight;
     int TextureChannels;
 
-    unsigned char* ImageData = stbi_load(filePath, &TextureWidth, &TextureHeight, &TextureChannels, 0);
+    
+    unsigned char* ImageData = stbi_load(filePath, &TextureWidth, &TextureHeight, &TextureChannels, 4);
 
     if (ImageData != NULL)
     {
@@ -148,10 +149,8 @@ GLFWcursor* loadImageToCursor(const char* filePath) {
         image.height = TextureHeight;
         image.pixels = ImageData;
 
-        // Tacka na površini slike kursora koja se ponaša kao hitboks, moze se menjati po potrebi
-        // Trenutno je gornji levi ugao, odnosno na 20% visine i 20% sirine slike kursora
-        int hotspotX = TextureWidth / 5;
-        int hotspotY = TextureHeight / 5;
+        int hotspotX = TextureWidth / 2;
+        int hotspotY = TextureHeight / 2;
 
         GLFWcursor* cursor = glfwCreateCursor(&image, hotspotX, hotspotY);
         stbi_image_free(ImageData);
@@ -160,6 +159,6 @@ GLFWcursor* loadImageToCursor(const char* filePath) {
     else {
         std::cout << "Kursor nije ucitan! Putanja kursora: " << filePath << std::endl;
         stbi_image_free(ImageData);
-
+        return nullptr;
     }
 }
