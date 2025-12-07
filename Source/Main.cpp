@@ -50,7 +50,7 @@ bool keyW = false;
 bool keyA = false;
 bool keyS = false;
 bool keyD = false;
-bool keySpace = false;
+//bool keySpace = false;
 bool keySpaceJustPressed = false;
 
 // cooking faza
@@ -76,6 +76,9 @@ struct Puddle {
     bool isKetchup;  // true = crvena, false = zuta
 };
 std::vector<Puddle> puddles;
+
+// custom kursor
+GLFWcursor* customCursor = nullptr;
 
 // pomocne funkcije
 float mouseToNDC_X() {
@@ -208,10 +211,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     // Space
     if (key == GLFW_KEY_SPACE) {
         if (action == GLFW_PRESS) {
-            keySpace = true;
+            //keySpace = true;
             keySpaceJustPressed = true;
         } else if (action == GLFW_RELEASE) {
-            keySpace = false;
+            //keySpace = false;
         }
     }
 }
@@ -349,6 +352,15 @@ int main() {
         std::cout << "Mustard tekstura ucitana uspesno!" << std::endl;
     } else {
         std::cout << "Greska: Senf tekstura nije ucitana!" << std::endl;
+    }
+
+    // ucitavanje custom kursora (samo jednom, pre loop-a!)
+    customCursor = loadImageToCursor("Resources/cursor.png");
+    if (customCursor != nullptr) {
+        glfwSetCursor(window, customCursor);
+        std::cout << "Kursor spatule ucitan uspesno!" << std::endl;
+    } else {
+        std::cout << "GRESKA: Kursor spatule nije ucitan! Koristi se default." << std::endl;
     }
 
     // postavke
@@ -909,16 +921,6 @@ int main() {
         glBindVertexArray(0);
         glUseProgram(0);
 
-
-        // spatula kursor
-        GLFWcursor* compassCursor = loadImageToCursor("./Resources/cursor.png");
-        if (compassCursor != nullptr) {
-            glfwSetCursor(window, compassCursor);
-        }
-        else {
-            std::cout << "Upozorenje: Kursor spatule nije ucitan. Koristi se default kursor." << std::endl;
-        }
-
         glfwSwapBuffers(window);
         
         // frame limiter
@@ -938,6 +940,11 @@ int main() {
     if (texPrijatno != 0) glDeleteTextures(1, &texPrijatno);
     if (texKetchup != 0) glDeleteTextures(1, &texKetchup);
     if (texMustard != 0) glDeleteTextures(1, &texMustard);
+
+    // oslobodi kursor
+    if (customCursor != nullptr) {
+        glfwDestroyCursor(customCursor);
+    }
 
     glfwDestroyWindow(window);
     glfwTerminate();
